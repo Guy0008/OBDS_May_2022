@@ -1,4 +1,6 @@
 ## header line
 .DS_Store
 .Rproj.user
-.txt
+*.txt
+*.pdf
+*.html
