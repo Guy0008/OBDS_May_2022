@@ -255,7 +255,11 @@ iris_raw %>%
       )
     )
 
-    
+iris_raw %>% summarise(across(.cols = where(is.numeric),.fns = mean) )
+iris_raw %>% summarise(across(is.numeric))
+  ## where () function cannot be used alone, must be applied to some other function together  
+##across() also cannot be used alone, need to be used with mutate() or summarise()
+
   
 ```
 
@@ -380,7 +384,7 @@ Reshape the `iris_raw` dataset in a tidy format where one observation is represe
 **Hint:** you want to pivot all the columns that start are numeric.
 
 ```{r}
-iris_long <- iris_raw %>% 
+iris_long <- iris_raw %>% pivot_longer(cols=ends_with("length")|ends_with("width"), names_to = "variable") %>% arrange(variable,value)
     
 iris_long
 ```
@@ -391,8 +395,10 @@ iris_long
 
 ```{r}
 # Copy the code chunk above and refine to address the issue
-iris_long2 <- iris_raw %>% 
-    
+##create a ID based on sequence and specise, and paste them together
+iris_long <- iris_raw %>% mutate(ID=paste0(species,seq(1,nrow(iris_raw))))
+##use pivot_longer to move colmn with required match to longer version
+iris_long2 <- iris_long %>% pivot_longer(cols=ends_with("length")|ends_with("width"), names_to = "variable") %>% arrange(variable,value)    
 iris_long2
 ```
 
@@ -409,7 +415,7 @@ iris_long2
 iris_long2 <- iris_raw %>% 
   
 iris_long2 %>%
-pivot_wider(names_from = dimension, values_from = measurement) %>%
+pivot_wider(names_from = variable, values_from = value) %>%
 select(- ID)  
 
 ```
