@@ -437,7 +437,12 @@ results(dds_filtered_updated,alpha = 0.05) %>% summary()
 
 ```{r}
 # What do the results() and summary() do, what arguments can you specify? 
-
+dds_filtered_updated<-readRDS(file="/t1-data/project/obds/jcui/projects/9_differential_expression/dds_filter_update_DESeq2_file.RDS")
+resultsNames(dds_filtered_updated)
+results_obj_replicate_3v1<-results(dds_filtered_updated,name = "replicate_3_vs_1",alpha = 0.05)
+dim(results_obj_replicate_3v1)
+results_obj_replicate_3v2<-results(dds_filtered_updated,name = "replicate_2_vs_1",alpha = 0.05)
+results_obj<-results(dds_filtered_updated,alpha = 0.05)
 
 ```
 
@@ -452,6 +457,8 @@ results(dds_filtered_updated,alpha = 0.05) %>% summary()
  
 ```{r}
 # Plot normalised counts for gene ENSMUSG00000041779
+plotCounts(dds_filtered_updated,gene="ENSMUSG00000041779",intgroup = "cell_type")
+ENSMUSG00000041779_gg<-plotCounts(dds_filtered_updated,gene="ENSMUSG00000041779",intgroup = "cell_type",returnData = TRUE)
 
 ```
 
@@ -468,6 +475,8 @@ Table should contain log2 fold changes and p-values for all genes
 # Plot a histogram of the raw and BH-adjusted p-values using ggplot – do they look as expected? for CD8 vs CD4
 
 ```{r}
+results_CD8vCD4_df<-as.data.frame(results_obj)
+ggplot(results_CD8vCD4_df)+geom_histogram(aes(x=pvalue,fill="blue"))+geom_histogram(aes(x=padj,fill="red"))
 
 ```
 
@@ -475,7 +484,7 @@ Table should contain log2 fold changes and p-values for all genes
 # Generate an MA plot of the log2 FC values for all genes using DESeq2 plotMA()
 
 ```{r}
-
+plotMA(results_obj,alpha=0.05)
 
 ```
 
@@ -484,7 +493,9 @@ Table should contain log2 fold changes and p-values for all genes
 ```{r}
 
 # call your results table  called shrunkenLFC_dds_results_obj
-
+shrunkenLFC_dds_results_obj<-lfcShrink(dds_filtered_updated,coef = 4,type = "apeglm")
+shrunkenLFC_dds_results_obj
+plotMA(shrunkenLFC_dds_results_obj,alpha=0.05)
 ```
 
 
@@ -493,25 +504,34 @@ Table should contain log2 fold changes and p-values for all genes
 ```{r}
 
 # convert shrunkenLFC_dds_results_obj to a dataframe and call it shrunkenLFC_dds_results_df
-
+shrunkenLFC_dds_results_df<- as.data.frame(shrunkenLFC_dds_results_obj)
 # Use the org.Mm.eg.db package to get gene symbols for the ensembl gene ids (hint:you did this on bioconductor day) 
+shrunkenLFC_dds_results_df
 
 # How many Ensembl IDs are not assigned an gene symbol and how many gene symbols are duplicated?
+library(org.Mm.eg.db)
 
 
-
-keytypes(org.Mm.eg.db)      #to remind us of what keytypes are in this particular db
+keytypes(org.Mm.eg.db)  
+#to remind us of what keytypes are in this particular db
 
 # use mapIds() to get 1:1 mapping for SYMBOL, ENTREZ and MGI
+gene_symbol<-mapIds(org.Mm.eg.db,keys = rownames(shrunkenLFC_dds_results_df),keytype = "ENSEMBL",column="SYMBOL" )
+
+gene_entrez<-mapIds(org.Mm.eg.db,keys = rownames(shrunkenLFC_dds_results_df),keytype = "ENSEMBL",column="ENTREZID" )
+gene_MGI<-mapIds(org.Mm.eg.db,keys = rownames(shrunkenLFC_dds_results_df),keytype = "ENSEMBL",column="MGI" )
 
 # add mapId vectors to  shrunkenLFC_dds_results_df
+shrunkenLFC_dds_results_df$gene_symbol<-gene_symbol
+shrunkenLFC_dds_results_df$gene_entrez<-gene_entrez
+shrunkenLFC_dds_results_df$gene_MGI<-gene_MGI
 ```
 
 
 # Export all the results to CSV
 
 ```{r}
-write_csv(shrunkenLFC_dds_results_df, "CD8_vs_CD4_DE_results_lfcshrinkage_allgenes.csv")
+write_csv(shrunkenLFC_dds_results_df, "/t1-data/project/obds/jcui/projects/9_differential_expression/CD8_vs_CD4_DE_results_lfcshrinkage_allgenes.csv")
 ```
 
 # Filter res_df and save as CSV
@@ -520,7 +540,7 @@ write_csv(shrunkenLFC_dds_results_df, "CD8_vs_CD4_DE_results_lfcshrinkage_allgen
 #Filter the results table for padj < 0.05 and absolute log2 FC > 1, and write to a CSV file
 res_0.05 <- shrunkenLFC_dds_results_df %>% 
     dplyr::filter(padj < 0.05 & abs(log2FoldChange) > 1)
-
+dim(res_0.05)
 #Get upregulated genes - Filter the results table for padj < 0.05 and log2FoldChange FC > 1, and write to a CSV file
 res_0.05_up <- shrunkenLFC_dds_results_df %>% 
     dplyr::filter(padj < 0.05 & log2FoldChange > 1)
@@ -530,13 +550,13 @@ res_0.05_down <- shrunkenLFC_dds_results_df %>%
     dplyr::filter(padj < 0.05 & log2FoldChange < -1)
 
 write_csv(res_0.05, 
-          "CD8_vs_CD4_DKO_DE_results_lfcshrinkage_0.05_log2FC1.csv")
+          "/t1-data/project/obds/jcui/projects/9_differential_expression/CD8_vs_CD4_DKO_DE_results_lfcshrinkage_0.05_log2FC1.csv")
 
 write_csv(res_0.05_up,
-          "CD8_vs_CD4_DKO_DE_results_lfcshrinkage_0.05_log2FC1_up.csv")
+          "/t1-data/project/obds/jcui/projects/9_differential_expression/CD8_vs_CD4_DKO_DE_results_lfcshrinkage_0.05_log2FC1_up.csv")
 
 write_csv(res_0.05_down,
-          "CD8_vs_CD4_DKO_DE_results_lfcshrinkage_0.05_log2FC1_down.csv")
+          "/t1-data/project/obds/jcui/projects/9_differential_expression/CD8_vs_CD4_DKO_DE_results_lfcshrinkage_0.05_log2FC1_down.csv")
 ```
 
 
