@@ -451,11 +451,8 @@ saveRDS(seurat_after_qc,file = "/t1-data/project/obds/jcui/projects/11_seurat/su
   How do you control the set of clusters that are used?
 
 ```{r}
-seurat_markers_all <- FindAllMarkers(
-    
-    
-    
-    
+seurat_after_qc<-readRDS(file = "/t1-data/project/obds/jcui/projects/11_seurat/surate_after_qc.RDS")
+seurat_markers_all <- FindAllMarkers(seurat_after_qc,min.pct = 0.25,only.pos = TRUE
 )
 class(seurat_markers_all)
 ```
@@ -468,6 +465,10 @@ class(seurat_markers_all)
 
 ```{r}
 head(seurat_markers_all)
+#pct.1: The percentage of cells where the gene is detected in the first group
+#pct.2: The percentage of cells where the gene is detected in the second group
+
+
 ```
 
 > Answer:
@@ -476,20 +477,22 @@ head(seurat_markers_all)
 - Filter and display the top 10 markers for cluster 3.
 
 ```{r}
-
+seurat_markers_all %>% filter(cluster==3) %>% slice_max(order_by = avg_log2FC,n=10)
 ```
 
 - Visualise the expression of the top 4 marker for cluster 3 on a UMAP layout.
 
 ```{r}
-
+seurat_markers_all %>% filter(cluster==3) %>% slice_max(order_by = avg_log2FC,n=4) %>% ggplot(aes(x=,y=avg_log2FC,fill=p_val_adj))+geom_col()
+colnames(seurat_after_qc[[]])
+FeaturePlot(seurat_after_qc,features =c("GZMK","CCL5","GZMA","CD8A") )
 ```
 
 - Visualise the expression of those same 4 marker as a violin plot.
   Do you have any particular preference between the two types of plots?
 
 ```{r}
-VlnPlot(
+VlnPlot(seurat_after_qc,features =c("GZMK","CCL5","GZMA","CD8A") 
     
     
 )
@@ -502,10 +505,27 @@ VlnPlot(
   Hint: you may want to use the function `dplyr::group_by()`.
 
 ```{r}
+#with_ties argument ti remove the repleat ties 
 markers_top10_clusters <- seurat_markers_all %>%
+  group_by(cluster) %>% 
+  slice_max(order_by = avg_log2FC,n=10,with_ties = FALSE) %>% 
+  select(gene)
+    markers_top10_clusters
+    head(markers_top10_clusters)
+DoHeatmap(seurat_after_qc,features = markers_top10_clusters$gene
     
     
-DoHeatmap(
+)
+
+
+#draw again by low p value first
+markers_top10_clusters <- seurat_markers_all %>%
+  group_by(cluster) %>% 
+  slice_min(order_by = p_val_adj,n=10,with_ties = FALSE) %>% 
+  select(gene)
+    markers_top10_clusters
+    head(markers_top10_clusters)
+DoHeatmap(seurat_after_qc,features = markers_top10_clusters$gene
     
     
 )

@@ -1,0 +1,499 @@
+---
+title: "13_singlecell_droplets"
+author: "Jianwei cui"
+date: '2022-05-26'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(DropletUtils)
+library(tidyverse)
+library(ggplot2)
+library(cowplot)
+library(scDblFinder)
+library(Seurat)
+library(DoubletFinder)
+library(celda)
+library(scater)
+```
+
+# Exercise
+
+## Empty droplets
+
+- Import the raw matrix into R; use `DropletUtils`.
+  Make a `SingleCellExperiment` object called `sce`.
+
+```{r}
+library(DropletUtils)
+sce <- DropletUtils::read10xCounts(samples = c(
+    "raw" = "/project/obds/shared/resources/4_r_single_cell/pbmc_5k/raw_feature_bc_matrix/"
+))
+  
+  
+
+sce
+rowData(sce)
+```
+
+- Remove droplets without any count at all.
+
+This will massively speed up downstream steps, while removing unquestionable empty droplets.
+
+```{r}
+library(tidyverse)
+colSums(counts(sce)) %>% head()
+which(colSums(counts(sce)) >0) %>% head()
+#colSums(counts(sce)) >0 also works, return TRUe and FALSE
+sce <- sce[,which(colSums(counts(sce)) >0) ]
+sce
+```
+```{r}
+
+rank_df<-DropletUtils::barcodeRanks(sce)
+head(rank_df)
+
+ggplot(as.data.frame(rank_df),aes(x=rank, y=total))+geom_point()+scale_x_log10()+scale_y_log10()+geom_hline(yintercept = 100,colour="red")
+```
+
+- Run `DropletUtils::emptyDrops()`.
+
+```{r}
+set.seed(123)
+out <- DropletUtils::emptyDrops(sce)
+out
+#the everything is less than 100UMI, the columns will be NA have not been tested 
+summary(out$Total>100)
+subset(out,Total>100) %>% head()
+ggplot(as.data.frame(out),aes(x=FDR))+geom_histogram()
+
+```
+
+**How do you read the output? Which droplets would you consider empty?**
+
+> Answer:
+> 
+>
+>
+> 
+
+- Remove empty droplets from the data sets.
+  Call the new object `sce_filtered_emptydrops`.
+
+```{r}
+out$empty<-out$FDR<0.001
+head(out)
+which(out$empty==TRUE)
+#return the location of the cell have FDR < 0.001
+
+sce_filtered_emptydrops <- sce[,which(out$empty==TRUE)]
+sce_filtered_emptydrops
+```
+
+## Bonus point
+
+- Draw plots comparing empty droplets and other droplets
+  (e.g., library size, mitochondrial content, PCA).
+
+```{r}
+is.mito <- grepl("^MT-", rowData(sce)$Symbol)
+library(scuttle)
+sce <- scuttle::addPerCellQC(sce, percent_top = 50, subsets = list(MT=is.mito))
+
+colData(sce)[["empty"]] <-out$empty
+#add a empty column true for cells, false for empty droplets and NA for empty dropet
+plot1 <- colData(sce) %>%
+    as_tibble() %>% 
+    ggplot() +
+    geom_violin(aes(empty, sum),scale= "width") +
+    labs(x = "Is cell containing droplet", y = "total UMI")
+plot2 <- colData(sce) %>%
+    as_tibble() %>% 
+    ggplot() +
+    geom_violin(aes(empty, detected),scale= "width") +
+    labs(x = "Is cell containing droplet", y = "features")
+plot3 <- colData(sce) %>%
+    as_tibble() %>% 
+    ggplot() +
+    geom_violin(aes(empty, subsets_MT_percent),scale= "width") +
+    labs(x = "Is cell containing droplet", y = "MT percentage")
+cowplot::plot_grid(plot1, plot2, plot3, nrow = 1)
+```
+
+
+```{r}
+plot_data <- tibble(
+  
+  
+)
+ggplot(   ) +
+  
+  
+  
+```
+
+```{r}
+is.mt <- 
+# table(is.mt)
+plot_data <- tibble(
+  
+  
+  
+  
+)
+ggplot(   ) +
+  
+  
+  
+```
+
+```{r}
+
+sce <- 
+sce <- 
+plot_data <- tibble(
+  
+  
+)
+ggplot(   ) +
+  
+  
+```
+
+- Import the filtered matrix for the same cells and compare their set of filtered cells to yours.
+
+```{r}
+sce_filtered_cellranger <- 
+  
+  
+
+
+all_barcodes <- colnames(sce)
+
+compare_table <- tibble(
+  emptydrops = all_barcodes %in%    ,
+  cellranger = all_barcodes %in%    ,
+)
+table(compare_table)
+```
+
+# Exercise
+
+## Doublets
+
+Continue using the data set after you excluded empty droplets.
+
+- Run `scDblFinder::scDblFinder()`.
+
+```{r}
+set.seed(123)
+sce_scdblfinder <- scDblFinder::scDblFinder(sce=sce_filtered_emptydrops,clusters = TRUE)
+#clusters=TRUE will run the cluster itself if no cluster has run
+#clusters are used to defined that cell from different clusters are used to generate artifical doublets 
+colData(sce_scdblfinder)
+table(  colData(sce_scdblfinder)$scDblFinder.class )
+plotDoubletMap(sce_scdblfinder)
+```
+
+**How do you read the output? Which droplets would you consider doublets?**
+
+> Answer:
+> 
+> 
+> 
+> 
+
+- Remove doublets from the data set.
+  Call the new object `sce_filtered_scdblfinder`.
+
+```{r}
+sce_filtered_scdblfinder <- sce_scdblfinder[,colData(sce_scdblfinder)$scDblFinder.class=="singlet"]
+sce_filtered_scdblfinder
+```
+
+## Bonus point
+
+- Draw plots comparing doublets and other droplets.
+  (e.g., library size, mitochondrial content, PCA)
+
+```{r}
+
+
+
+is.mito <- grepl("^MT-", rowData(sce_scdblfinder)$Symbol)
+library(scuttle)
+sce_scdblfinder <- scuttle::addPerCellQC(sce_scdblfinder, percent_top = 50, subsets = list(MT=is.mito))
+
+colData(sce_scdblfinder)
+#add a empty column true for cells, false for empty droplets and NA for empty dropet
+plot1 <- colData(sce_scdblfinder) %>%
+    as_tibble() %>% 
+    ggplot() +
+    geom_violin(aes(scDblFinder.class, sum),scale= "width") +
+    labs(x = "cell class", y = "total UMI")
+plot2 <- colData(sce_scdblfinder) %>%
+    as_tibble() %>% 
+    ggplot() +
+    geom_violin(aes(scDblFinder.class, detected),scale= "width") +
+    labs(x = "cell class", y = "features")
+plot3 <- colData(sce_scdblfinder) %>%
+    as_tibble() %>% 
+    ggplot() +
+    geom_violin(aes(scDblFinder.class, subsets_MT_percent),scale= "width") +
+    labs(x = "cell class", y = "MT percentage")
+cowplot::plot_grid(plot1, plot2, plot3, nrow = 1)
+
+plot_data <- tibble(
+  
+  
+)
+ggplot(   ) +
+  
+  
+  
+```
+
+```{r}
+is.mt <- 
+
+plot_data <- tibble(
+  
+  
+  
+  
+)
+ggplot(   ) +
+  
+  
+  
+```
+
+```{r}
+sce_scdblfinder <- 
+sce_scdblfinder <- 
+plot_data <- tibble(
+  
+  
+)
+
+ggplot(   ) +
+  
+  
+```
+
+- Compare results with the output of `chris-mcginnis-ucsf/DoubletFinder`
+
+  + You will need to make a `Seurat` object.
+
+```{r, message=FALSE}
+## Pre-process Seurat object (standard)
+seu <- 
+seu <- 
+seu <- 
+seu <- 
+seu <- 
+seu <- 
+```
+
+```{r, message=FALSE}
+## pK Identification (no ground-truth) 
+
+sweep.res.list <- 
+
+sweep.stats <- 
+bcmvn <- 
+```
+
+```{r}
+ggplot() +
+  
+  
+  
+```
+
+```{r}
+## Homotypic Doublet Proportion Estimate 
+homotypic.prop <- 
+nExp_poi <- 
+nExp_poi.adj <- 
+```
+
+```{r, message=FALSE}
+## Run DoubletFinder with varying classification stringencies 
+seu <- 
+```
+
+```{r}
+table(   )
+```
+
+```{r, message=FALSE}
+seu <- 
+```
+
+```{r}
+table(   )
+```
+
+```{r}
+doublets_table <- data.frame(
+  
+  
+  
+)
+table(doublets_table)
+```
+
+# Exercise
+
+## Ambient RNA
+
+- Run `celda::decontX()` (continue using the data after excluding empty droplets and doublets).
+
+```{r, message=FALSE}
+colData(sce_filtered_scdblfinder)
+sce_decontX <- decontX(sce_filtered_scdblfinder,z=colData(sce_filtered_scdblfinder)$scDblFinder.cluster)
+dim(sce_filtered_scdblfinder)
+colnames(colData(sce_decontX))
+ggplot(as.data.frame(colData(sce_decontX)),aes(x=decontX_contamination))+geom_histogram()
+head(assay(sce_decontX,"decontXcounts"))
+sce_decontX
+```
+
+- Visualize the UMAP layout created by `decontX`; use `plotDimReduceCluster()`.
+
+```{r}
+umap <- reducedDim(sce_decontX,"decontX_UMAP")
+  head(umap)
+plotDimReduceCluster(sce_decontX$decontX_clusters ,reducedDimName = "decontX_UMAP",dim=umap[,1],dim2 = umap[,2]  )     
+
+```
+
+```{r}
+sce_decontX <- decontX(sce_filtered_scdblfinder,varGenes=2000)
+colData(sce_decontX)
+ggplot(as.data.frame(colData(sce_decontX)),aes(x=decontX_contamination))+geom_histogram()
+umap <- reducedDim(sce_decontX,"decontX_UMAP")
+  head(umap)
+plotDimReduceCluster(sce_decontX$decontX_clusters ,reducedDimName = "decontX_UMAP",dim=umap[,1],dim2 = umap[,2]  )   
+plotDimReduceCluster(sce_decontX$decontX_clusters ,reducedDimName = "decontX_UMAP",dim=umap[,1],dim2 = umap[,2]  )  
+```
+
+
+- Visualize the percentage of contamination estimated by `decontX` in each cell.
+  Use the `plotDecontXContamination()` function.
+
+```{r}
+plotDecontXContamination( sce_decontX  )
+```
+
+**Does any cluster display higher (estimated) levels of ambient RNA?**
+
+> Answer:
+> 
+> 
+
+- Visualize the log-normalised expression of marker genes on a UMAP layout faceted by gene; use `plotDimReduceFeature()`.
+
+**Note:** For instance, use `CD3D`, `CD3E`, `GNLY`, `LYZ`, `S100A8`, `S100A9`, `CD79A`, `CD79B`, and `MS4A1`.
+
+<!--
+Source: https://bioconductor.org/packages/devel/bioc/vignettes/celda/inst/doc/decontX.pdf
+(Section 5.3)
+We will use:
+- CD3D and CD3E for T-cells,
+- LYZ, S100A8, and S100A9 for monocytes,
+- CD79A, CD79B, and MS4A1 for B-cells,
+- GNLY for NK-cells,
+- and PPBP for megakaryocytes
+-->
+
+
+
+```{r}
+
+sce_decontX<-logNormCounts(sce_decontX,assay.type ="decontXcounts")
+assays(sce_decontX)
+#make uqique name with gene ID and symbols
+rownames(sce_decontX) <- uniquifyFeatureNames(ID=rowData( sce_decontX)$ID,names = rowData( sce_decontX)$Symbol
+
+)
+assay(sce_decontX,"logcounts")
+plotDimReduceFeature(assay(sce_decontX,"logcounts"),
+                     features = c("CD3D", "CD3E", "GNLY", "LYZ", "S100A8", "S100A9", "CD79A", "CD79B", "MS4A1"),
+               
+                    dim1=umap[,1],dim2 = umap[,2]
+                     
+  
+  
+  
+  
+  
+  
+  
+)
+```
+
+- Visualise the percentage of cells with detectable expression of marker genes before and after decontamination as a bar plot; use `plotDecontXMarkerPercentage()`.
+
+```{r}
+
+markers <- list(
+  
+  Tcell_Markers = c("CD3E", "CD3D"), 
+  Bcell_Markers = c("CD79A", "CD79B", "MS4A1"), 
+  Monocyte_Markers = c("S100A8", "S100A9", "LYZ"), 
+  NKcell_Markers = "GNLY" 
+  
+  
+)
+cellTypeMappings <- list(
+  T_cell=c(1,3),B_cell=c(4),Mono_cell=c(2,9),NK=c(6)
+  )
+plotDecontXMarkerPercentage(sce_decontX,
+                            markers = markers,
+                            groupClusters = cellTypeMappings,
+                            assayName = c("counts", "decontXcounts")
+  
+  
+  
+  
+)
+```
+
+```{r}
+plotDecontXMarkerPercentage(
+  sce_decontX,
+  
+  
+  
+)
+```
+
+```{r}
+plotDecontXMarkerPercentage(
+  
+  
+  
+  
+)
+```
+
+- Visualize the log-normalised expression of marker genes before and after decontamination as a violin plot; use `plotDecontXMarkerExpression()`.
+
+```{r}
+sce_decontX
+#similar plot just a violin plot
+plotDecontXMarkerExpression(
+  sce_decontX,
+  markers = markers,
+                            groupClusters = cellTypeMappings,
+                            assayName = c("counts", "decontXcounts"),
+  log1p=TRUE
+  
+  
+  
+  
+)
+```
